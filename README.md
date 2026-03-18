@@ -1,10 +1,10 @@
 # COBOL2Java
 
-A desktop GUI tool that converts COBOL source code into modern, idiomatic Java — with full object-oriented transformation, vendor dialect support, and 59-language UI localization.
+A desktop GUI and Command Line (CLI) tool that converts COBOL source code into modern, idiomatic Java — with full object-oriented transformation, vendor dialect support, and 59-language UI localization.
 
 ![Python](https://img.shields.io/badge/Python-3.8%2B-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
-![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey)
+![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
 ![Languages](https://img.shields.io/badge/UI_Languages-59-orange)
 
 ## Overview
@@ -18,7 +18,8 @@ COBOL2Java parses COBOL source files and generates clean, well-structured Java c
 - **EXEC SQL / CICS / DLI** — Handles embedded SQL, CICS transactions, and IMS/DLI calls with appropriate Java equivalents
 - **Auto Vendor Detection** — Automatically identifies the COBOL dialect from source code patterns
 - **59-Language UI** — Fully localized interface covering East Asia, Southeast Asia, South Asia, Europe, Middle East, Africa, and more
-- **Standalone EXE** — Ships as a single Windows executable (no Python required on target machine)
+- **CLI & CI/CD Ready** — Headless command-line mode for bulk conversions and automated pipelines
+- **Standalone Binaries** — Ships as a single executable for Windows, macOS, and Linux (no Python required on target machine)
 
 ## Screenshots
 
@@ -31,9 +32,9 @@ The application provides a clean, modern GUI built with tkinter:
 
 ## Quick Start
 
-### Option 1: Run the EXE (Windows)
+### Option 1: Run the Pre-built Binary
 
-Download `COBOL2Java.exe` from the [Releases](../../releases) page and run it directly. No installation needed.
+Download the executable for your OS (`COBOL2Java.exe` for Windows, or the respective Linux/macOS binary) from the [Releases](../../releases) page and run it directly. No installation needed.
 
 ### Option 2: Run from Source
 
@@ -49,17 +50,23 @@ pip install -r requirements.txt
 python main.py
 ```
 
-### Option 3: Build Your Own EXE
+### Option 3: Build Your Own Binary
 
 ```bash
 # On Windows
 build.bat
 # Output: dist/COBOL2Java.exe
+
+# On macOS / Linux
+chmod +x build.sh
+./build.sh
+# Output: dist/COBOL2Java
 ```
 
 ## Usage
 
-1. **Launch** the application (`python main.py` or `COBOL2Java.exe`)
+### GUI Mode
+1. **Launch** the application (`python main.py`, `COBOL2Java.exe`, or `./COBOL2Java`)
 2. **Select Input Folder** — directory containing `.cbl`, `.cob`, or `.cobol` files
 3. **Select Output Folder** — where generated Java files will be written
 4. **Configure Options:**
@@ -69,6 +76,26 @@ build.bat
    - **Vendor Dialect** — select a specific COBOL vendor or use Auto Detect
    - **Checkboxes** — toggle getters/setters, BigDecimal, Javadoc, class extraction, etc.
 5. **Click Convert** and monitor progress in the log panel
+
+### CLI Mode (Headless)
+You can run the tool from the terminal for automated pipelines or batch processing. Providing both `-i` and `-o` will automatically launch CLI mode.
+
+```bash
+python main.py -i ./samples -o ./output --vendor auto --package com.example.migrated
+# Or using the binary:
+./COBOL2Java -i ./samples -o ./output
+```
+
+**Common Arguments:**
+- `-i, --input`: Input folder (Required for CLI)
+- `-o, --output`: Output folder (Required for CLI)
+- `-p, --package`: Package name (default: `com.migrated`)
+- `-e, --encoding`: Source file encoding (default: `utf-8`)
+- `--vendor`: Dialect (`auto`, `standard`, `ibm`, `fujitsu`, `microfocus`, etc.)
+- `--no-getters`: Disable generation of getters/setters
+- `--no-javadoc`: Disable Javadoc comment generation
+
+Run `python main.py --help` to see all available options.
 
 ## Architecture
 
@@ -83,6 +110,7 @@ cobol2java/
 │   └── i18n.py              # Internationalization (59 languages)
 ├── samples/                 # Sample COBOL programs for testing
 ├── build.bat                # Windows EXE build script (PyInstaller)
+├── build.sh                 # macOS/Linux build script (PyInstaller)
 ├── requirements.txt         # Python dependencies
 └── test_conversion.py       # Quick conversion test script
 ```

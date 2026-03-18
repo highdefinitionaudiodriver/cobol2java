@@ -26,7 +26,7 @@ echo.
 echo [2/3] Building EXE...
 cd /d "%~dp0"
 
-pyinstaller ^
+python -m PyInstaller ^
     --name "COBOL2Java" ^
     --onefile ^
     --windowed ^
