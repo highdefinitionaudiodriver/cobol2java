@@ -16,12 +16,17 @@ from .vendor_extensions import (
     generate_exec_cics_java, generate_exec_dli_java,
     generate_gnucobol_call_java
 )
+from .conversion_strategies import (
+    ConversionStrategyRegistry, get_default_registry
+)
 
 
 class JavaCodeGenerator:
-    def __init__(self, options: TransformOptions = None):
+    def __init__(self, options: TransformOptions = None,
+                 strategy_registry: ConversionStrategyRegistry = None):
         self.options = options or TransformOptions()
         self.indent = "    "
+        self.strategies = strategy_registry or get_default_registry()
 
     def generate_project(self, project: JavaProject, output_dir: str):
         os.makedirs(output_dir, exist_ok=True)
@@ -673,7 +678,7 @@ class JavaCodeGenerator:
             lines = []
             for f in files:
                 handler = to_camel_case(f) + "Handler"
-                lines.append(f'{indent}{handler}.open("{mode}");')
+                lines.extend(self.strategies.file_io.generate_open(handler, mode, indent))
             return lines
         return [f"{indent}// TODO: {text}"]
 
@@ -682,7 +687,11 @@ class JavaCodeGenerator:
         match = re.match(r'CLOSE\s+(.*)', text, re.IGNORECASE)
         if match:
             files = [f.strip() for f in match.group(1).split() if f.strip()]
-            return [f"{indent}{to_camel_case(f)}Handler.close();" for f in files]
+            lines = []
+            for f in files:
+                handler = to_camel_case(f) + "Handler"
+                lines.extend(self.strategies.file_io.generate_close(handler, indent))
+            return lines
         return [f"{indent}// TODO: {text}"]
 
     def _gen_read(self, stmt: Statement, indent: str) -> List[str]:
@@ -693,17 +702,15 @@ class JavaCodeGenerator:
             handler = to_camel_case(file_name) + "Handler"
             record_var = to_camel_case(file_name) + "Record"
 
-            lines = [f"{indent}String {record_var} = {handler}.readRecord();"]
+            lines = list(self.strategies.file_io.generate_read(handler, record_var, indent))
 
             # Check for AT END
             at_end_match = re.search(r'AT\s+END\s+(.*?)(?:NOT\s+AT\s+END|$)', text, re.IGNORECASE)
             if at_end_match:
-                lines = [
-                    f"{indent}String {record_var} = {handler}.readRecord();",
-                    f'{indent}if ("{record_var}" == null) {{',
-                    f"{indent}{self.indent}// AT END processing",
-                    f"{indent}}}",
-                ]
+                lines = list(self.strategies.file_io.generate_read(handler, record_var, indent))
+                lines.append(f'{indent}if ({record_var} == null) {{')
+                lines.append(f"{indent}{self.indent}// AT END processing")
+                lines.append(f"{indent}}}")
 
             return lines
         return [f"{indent}// TODO: {text}"]
@@ -714,7 +721,9 @@ class JavaCodeGenerator:
         if match:
             record = match.group(1)
             handler = to_camel_case(record) + "Handler"
-            return [f"{indent}{handler}.writeRecord({to_camel_case(record)}.toString());"]
+            return list(self.strategies.file_io.generate_write(
+                handler, f"{to_camel_case(record)}.toString()", indent
+            ))
         return [f"{indent}// TODO: {text}"]
 
     def _gen_initialize(self, stmt: Statement, indent: str) -> List[str]:
@@ -879,7 +888,11 @@ class JavaCodeGenerator:
         ]
 
     def _gen_exec(self, stmt: Statement, indent: str) -> List[str]:
-        """Generate Java code for EXEC SQL/CICS/DLI blocks using vendor_extensions."""
+        """Generate Java code for EXEC SQL/CICS/DLI blocks.
+
+        SQL and CICS blocks delegate to registered ConversionStrategy
+        when possible, falling back to vendor_extensions for unhandled cases.
+        """
         raw = stmt.raw_text
         # Remove trailing period if present
         if raw.endswith("."):
@@ -889,9 +902,9 @@ class JavaCodeGenerator:
             return [f"{indent}// TODO: EXEC block - {raw[:80]}"]
 
         if stmt.type == StatementType.EXEC_SQL:
-            return generate_exec_sql_java(block, indent)
+            return self._gen_exec_sql_via_strategy(block, indent)
         elif stmt.type == StatementType.EXEC_CICS:
-            return generate_exec_cics_java(block, indent)
+            return self._gen_exec_cics_via_strategy(block, indent)
         elif stmt.type == StatementType.EXEC_DLI:
             return generate_exec_dli_java(block, indent)
         else:
@@ -900,6 +913,94 @@ class JavaCodeGenerator:
                 f"{indent}// TODO: Manual conversion required",
                 f"{indent}// {raw[:100]}",
             ]
+
+    def _gen_exec_sql_via_strategy(self, block, indent: str) -> List[str]:
+        """Delegate EXEC SQL to SqlConversionStrategy."""
+        sql_type = block.parameters.get("type", "OTHER")
+        sql = block.parameters.get("sql", "")
+        host_vars = [v.strip() for v in block.parameters.get("host_variables", "").split(",") if v.strip()]
+
+        lines = [f"{indent}// EXEC SQL: {block.command}"]
+
+        if sql_type == "CURSOR" and block.command == "DECLARE":
+            cursor_match = re.search(r'DECLARE\s+(\S+)\s+CURSOR\s+FOR\s+(.*)', sql, re.IGNORECASE | re.DOTALL)
+            if cursor_match:
+                lines.extend(self.strategies.sql.generate_cursor_declare(
+                    cursor_match.group(1), cursor_match.group(2).strip().rstrip("."), indent
+                ))
+            return lines
+
+        if sql_type == "CURSOR" and block.command == "OPEN":
+            cursor_match = re.search(r'OPEN\s+(\S+)', sql, re.IGNORECASE)
+            if cursor_match:
+                lines.extend(self.strategies.sql.generate_cursor_open(
+                    cursor_match.group(1), host_vars, indent
+                ))
+            return lines
+
+        if sql_type == "CURSOR" and block.command == "FETCH":
+            cursor_match = re.search(r'FETCH\s+(\S+)\s+INTO\s+(.*)', sql, re.IGNORECASE | re.DOTALL)
+            if cursor_match:
+                into_vars = [v.strip().lstrip(":") for v in cursor_match.group(2).split(",")]
+                lines.extend(self.strategies.sql.generate_cursor_fetch(
+                    cursor_match.group(1), into_vars, indent
+                ))
+            return lines
+
+        if sql_type == "CURSOR" and block.command == "CLOSE":
+            cursor_match = re.search(r'CLOSE\s+(\S+)', sql, re.IGNORECASE)
+            if cursor_match:
+                lines.extend(self.strategies.sql.generate_cursor_close(
+                    cursor_match.group(1), indent
+                ))
+            return lines
+
+        if block.command == "SELECT":
+            into_match = re.search(r'SELECT\s+(.*?)\s+INTO\s+(.*?)\s+FROM\s+(.*)', sql, re.IGNORECASE | re.DOTALL)
+            if into_match:
+                into_vars = [v.strip().lstrip(":") for v in into_match.group(2).split(",")]
+                select_cols = into_match.group(1).strip()
+                from_clause = into_match.group(3).strip().rstrip(".")
+                full_sql = f"SELECT {select_cols} FROM {from_clause}"
+                lines.extend(self.strategies.sql.generate_select(
+                    full_sql, host_vars, into_vars, indent
+                ))
+            return lines
+
+        if block.command in ("INSERT", "UPDATE", "DELETE"):
+            lines.extend(self.strategies.sql.generate_insert_update_delete(
+                sql, host_vars, indent
+            ))
+            return lines
+
+        if block.command == "COMMIT":
+            lines.extend(self.strategies.sql.generate_commit(indent))
+            return lines
+
+        if block.command == "ROLLBACK":
+            lines.extend(self.strategies.sql.generate_rollback(indent))
+            return lines
+
+        # Fallback to vendor_extensions for INCLUDE, WHENEVER, etc.
+        return generate_exec_sql_java(block, indent)
+
+    def _gen_exec_cics_via_strategy(self, block, indent: str) -> List[str]:
+        """Delegate EXEC CICS to CicsConversionStrategy where possible."""
+        params = block.parameters
+        cics_type = params.get("type", "OTHER")
+        cmd = block.command
+
+        if cics_type == "TERMINAL_IO":
+            return self.strategies.cics.generate_terminal_io(cmd, params, indent)
+        elif cics_type == "FILE_IO":
+            return self.strategies.cics.generate_file_io(cmd, params, indent)
+        elif cics_type == "PROGRAM_CONTROL":
+            return self.strategies.cics.generate_program_control(cmd, params, indent)
+        elif cics_type == "TEMP_STORAGE":
+            return self.strategies.cics.generate_temp_storage(cmd, params, indent)
+        else:
+            # Fallback to existing vendor_extensions for other CICS types
+            return generate_exec_cics_java(block, indent)
 
     # --- Helper methods ---
 

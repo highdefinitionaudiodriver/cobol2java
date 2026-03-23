@@ -1,11 +1,12 @@
 # COBOL2Java
 
-A desktop GUI and Command Line (CLI) tool that converts COBOL source code into modern, idiomatic Java — with full object-oriented transformation, vendor dialect support, and 59-language UI localization.
+A desktop GUI and Command Line (CLI) tool that converts COBOL source code into modern, idiomatic Java — with full object-oriented transformation, vendor dialect support, pluggable conversion strategies, and 59-language UI localization.
 
 ![Python](https://img.shields.io/badge/Python-3.8%2B-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
 ![Languages](https://img.shields.io/badge/UI_Languages-59-orange)
+![Tests](https://img.shields.io/badge/Tests-184%20passed-brightgreen)
 
 ## Overview
 
@@ -14,33 +15,27 @@ COBOL2Java parses COBOL source files and generates clean, well-structured Java c
 ### Key Features
 
 - **Smart OOP Transformation** — Converts procedural COBOL into idiomatic Java classes with proper encapsulation, getters/setters, `toString()`, and Javadoc
+- **Structured Parser Architecture** — Three-phase parser pipeline (DATA DIVISION → PROCEDURE DIVISION → Division-level integration) with declarative verb registry and recursive descent block parsing
 - **10 Vendor Dialects** — Supports IBM Enterprise COBOL, Fujitsu NetCOBOL, NEC ACOS, Hitachi VOS3, Micro Focus Visual COBOL, Unisys MCP/ClearPath, Bull/Atos GCOS, HP NonStop, GnuCOBOL, and standard COBOL-85/2002/2014
 - **EXEC SQL / CICS / DLI** — Handles embedded SQL, CICS transactions, and IMS/DLI calls with appropriate Java equivalents
+- **Pluggable Conversion Strategies** — Strategy Pattern interfaces for File I/O, SQL, and CICS conversion — swap between JDBC, JPA/Hibernate, VSAM-to-DB, and custom backends
 - **Auto Vendor Detection** — Automatically identifies the COBOL dialect from source code patterns
 - **59-Language UI** — Fully localized interface covering East Asia, Southeast Asia, South Asia, Europe, Middle East, Africa, and more
+- **Recursive Subfolder Conversion** — Converts COBOL files in nested subfolders, preserving the directory structure in output
 - **CLI & CI/CD Ready** — Headless command-line mode for bulk conversions and automated pipelines
-- **Standalone Binaries** — Ships as a single executable for Windows, macOS, and Linux (no Python required on target machine)
-
-## Screenshots
-
-The application provides a clean, modern GUI built with tkinter:
-
-- Select input/output folders
-- Choose vendor dialect (or auto-detect)
-- Configure Java output options (package name, encoding, BigDecimal, Javadoc, etc.)
-- Real-time conversion log with syntax highlighting
+- **MVC Architecture** — Clean separation of Model, View, and Controller for the GUI application
 
 ## Quick Start
 
 ### Option 1: Run the Pre-built Binary
 
-Download the executable for your OS (`COBOL2Java.exe` for Windows, or the respective Linux/macOS binary) from the [Releases](../../releases) page and run it directly. No installation needed.
+Download the executable for your OS (`COBOL2Java.exe` for Windows, or the respective Linux/macOS binary) from the [Releases](https://github.com/highdefinitionaudiodriver/cobol2java/releases) page and run it directly. No installation needed.
 
 ### Option 2: Run from Source
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/cobol2java.git
+git clone https://github.com/highdefinitionaudiodriver/cobol2java.git
 cd cobol2java
 
 # Install dependencies (only PyInstaller for building; the tool itself has no runtime deps)
@@ -101,18 +96,31 @@ Run `python main.py --help` to see all available options.
 
 ```
 cobol2java/
-├── main.py                  # GUI application entry point
+├── main.py                        # Entry point (CLI + GUI bootstrap)
 ├── src/
-│   ├── cobol_parser.py      # COBOL lexer & parser → structured AST
-│   ├── oop_transformer.py   # AST → Java OOP model (classes, enums, services)
-│   ├── java_generator.py    # Java OOP model → .java source files
-│   ├── vendor_extensions.py # Vendor-specific dialect handling (10 vendors)
-│   └── i18n.py              # Internationalization (59 languages)
-├── samples/                 # Sample COBOL programs for testing
-├── build.bat                # Windows EXE build script (PyInstaller)
-├── build.sh                 # macOS/Linux build script (PyInstaller)
-├── requirements.txt         # Python dependencies
-└── test_conversion.py       # Quick conversion test script
+│   ├── cobol_parser.py            # COBOL lexer & parser → structured AST
+│   ├── division_parser.py         # Division-level routing (ID/ENV/DATA/PROC)
+│   ├── lark_data_parser.py        # Structured DATA DIVISION parser
+│   ├── lark_procedure_parser.py   # Structured PROCEDURE DIVISION parser
+│   ├── oop_transformer.py         # AST → Java OOP model (classes, enums, services)
+│   ├── java_generator.py          # Java OOP model → .java source files
+│   ├── conversion_strategies.py   # Strategy interfaces (File I/O, SQL, CICS)
+│   ├── vendor_extensions.py       # Vendor-specific dialect handling (10 vendors)
+│   ├── gui_model.py               # GUI Model layer (MVC)
+│   ├── gui_view.py                # GUI View layer (MVC)
+│   ├── gui_controller.py          # GUI Controller layer (MVC)
+│   └── i18n.py                    # Internationalization (59 languages)
+├── tests/
+│   ├── conftest.py                # Shared pytest fixtures
+│   ├── test_data_types.py         # COMP-3, POINTER, data type tests (30 tests)
+│   ├── test_copy.py               # COPY statement tests (11 tests)
+│   ├── test_control_flow.py       # PERFORM, GO TO, IF/EVALUATE tests (18 tests)
+│   ├── test_lark_parser.py        # DATA DIVISION parser tests (37 tests)
+│   ├── test_procedure_parser.py   # PROCEDURE DIVISION parser tests (56 tests)
+│   └── test_strategies.py         # Conversion strategy tests (32 tests)
+├── samples/                       # Sample COBOL programs for testing
+├── build.bat / build.sh           # Build scripts (PyInstaller)
+└── requirements.txt               # Python dependencies
 ```
 
 ### Conversion Pipeline
@@ -121,25 +129,56 @@ cobol2java/
 COBOL Source (.cbl)
     │
     ▼
-┌──────────────┐
-│ CobolParser   │  Parse divisions, sections, paragraphs, data items,
-│               │  EXEC blocks, COPY statements, 88-levels, etc.
-└──────┬───────┘
-       │  CobolProgram (AST)
-       ▼
-┌──────────────┐
-│OopTransformer │  Extract data classes, enums, service classes,
-│               │  file handlers; map COBOL types → Java types
-└──────┬───────┘
-       │  JavaProject (OOP model)
-       ▼
-┌──────────────┐
-│JavaGenerator  │  Emit .java files with proper imports, Javadoc,
-│               │  getters/setters, toString(), and formatting
-└──────┬───────┘
-       │
-       ▼
-  Java Source Files (.java)
+┌─────────────────────┐
+│ CobolParser           │  Preprocessor (fixed/free format) →
+│  ├─ DivisionRouter    │  Division detection & dispatch →
+│  ├─ LarkDataParser    │  Structured DATA DIVISION parsing →
+│  └─ ProcedureParser   │  Declarative verb classification &
+│                       │  recursive descent block parsing
+└──────────┬────────────┘
+           │  CobolProgram (AST)
+           ▼
+┌─────────────────────┐
+│ OopTransformer       │  Extract data classes, enums, service classes,
+│                      │  file handlers; map COBOL types → Java types
+│                      │  (uses ConversionStrategyRegistry)
+└──────────┬──────────┘
+           │  JavaProject (OOP model)
+           ▼
+┌─────────────────────┐
+│ JavaCodeGenerator    │  Emit .java files with proper imports, Javadoc,
+│                      │  getters/setters, toString(), and formatting
+│                      │  (delegates to Strategy for SQL/File I/O/CICS)
+└──────────┬──────────┘
+           │
+           ▼
+     Java Source Files (.java)
+```
+
+### Conversion Strategy Extension Points
+
+The conversion engine provides pluggable Strategy interfaces for customizing how COBOL constructs map to Java:
+
+| Strategy Interface | Purpose | Default | Alternatives |
+|---|---|---|---|
+| `FileIoStrategy` | OPEN/CLOSE/READ/WRITE | `DefaultFileIoStrategy` (java.io) | `VsamToDatabaseStrategy` (JDBC) |
+| `SqlConversionStrategy` | EXEC SQL | `JdbcSqlStrategy` (PreparedStatement) | `JpaSqlStrategy` (EntityManager) |
+| `CicsConversionStrategy` | EXEC CICS | `DefaultCicsStrategy` (abstract interface) | Custom implementation |
+
+**Usage example:**
+```python
+from src.conversion_strategies import ConversionStrategyRegistry, JpaSqlStrategy, VsamToDatabaseStrategy
+from src.java_generator import JavaCodeGenerator
+from src.oop_transformer import OopTransformer
+
+# Create a custom strategy registry
+registry = ConversionStrategyRegistry()
+registry.sql = JpaSqlStrategy()              # EXEC SQL → JPA/Hibernate
+registry.file_io = VsamToDatabaseStrategy()  # VSAM → Database tables
+
+# Pass to transformer and generator
+transformer = OopTransformer(options, strategy_registry=registry)
+generator = JavaCodeGenerator(options, strategy_registry=registry)
 ```
 
 ## Supported Vendor Dialects
@@ -174,11 +213,33 @@ The interface is fully localized in 59 languages:
 | **Africa** | Kiswahili, Afrikaans, አማርኛ |
 | **Southern Europe** | Ελληνικά |
 
+## Testing
+
+```bash
+# Run all 184 tests
+python -m pytest tests/ -v
+
+# Run specific test suites
+python -m pytest tests/test_strategies.py -v      # Conversion strategies
+python -m pytest tests/test_procedure_parser.py -v # PROCEDURE DIVISION parser
+python -m pytest tests/test_lark_parser.py -v      # DATA DIVISION parser
+python -m pytest tests/test_data_types.py -v       # Data type mapping
+```
+
 ## Requirements
 
 - **Python 3.8+** (for running from source)
 - **PyInstaller 5.0+** (only for building the EXE)
+- **pytest** (for running tests)
 - **No runtime dependencies** — the tool uses only Python standard library (`tkinter`, `re`, `dataclasses`, `threading`)
+
+## Contributing
+
+Bug reports and feature requests are welcome via [GitHub Issues](https://github.com/highdefinitionaudiodriver/cobol2java/issues).
+
+## Author
+
+**highdefinitionaudiodriver** — [GitHub](https://github.com/highdefinitionaudiodriver)
 
 ## License
 

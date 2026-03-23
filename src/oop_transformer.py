@@ -8,6 +8,9 @@ from .cobol_parser import (
     CobolProgram, DataItem, Paragraph, Section, Statement,
     StatementType, FileDefinition, to_pascal_case, to_camel_case
 )
+from .conversion_strategies import (
+    ConversionStrategyRegistry, get_default_registry
+)
 
 
 @dataclass
@@ -76,8 +79,10 @@ class TransformOptions:
 
 
 class OopTransformer:
-    def __init__(self, options: TransformOptions = None):
+    def __init__(self, options: TransformOptions = None,
+                 strategy_registry: ConversionStrategyRegistry = None):
         self.options = options or TransformOptions()
+        self.strategies = strategy_registry or get_default_registry()
 
     def transform(self, program: CobolProgram) -> JavaProject:
         project = JavaProject()
@@ -240,6 +245,7 @@ class OopTransformer:
 
     def _extract_file_handlers(self, program: CobolProgram) -> List[JavaClass]:
         handlers = []
+        file_io_strategy = self.strategies.file_io
 
         for file_def in program.files:
             cls = JavaClass(
@@ -247,27 +253,39 @@ class OopTransformer:
                 package_name=self.options.package_name + ".io",
                 comment=f"File handler for COBOL file: {file_def.select_name}",
             )
-            cls.imports.add("java.io.*")
-            cls.imports.add("java.nio.file.*")
+            # Use strategy-provided imports
+            cls.imports.update(file_io_strategy.generate_imports())
 
-            # Fields
-            cls.fields.append(JavaField(
-                name="filePath",
-                java_type="String",
-                access="private",
-            ))
-            cls.fields.append(JavaField(
-                name="fileStatus",
-                java_type="String",
-                initial_value='"00"',
-                access="private",
-            ))
-
-            if file_def.organization.upper() in ("SEQUENTIAL", "LINE SEQUENTIAL"):
-                cls.imports.add("java.io.BufferedReader")
-                cls.imports.add("java.io.BufferedWriter")
-                cls.fields.append(JavaField(name="reader", java_type="BufferedReader", access="private"))
-                cls.fields.append(JavaField(name="writer", java_type="BufferedWriter", access="private"))
+            # Use strategy-provided fields
+            org = file_def.organization
+            field_lines = file_io_strategy.generate_handler_fields(
+                file_def.select_name or file_def.fd_name or "File", org
+            )
+            for fl in field_lines:
+                # Parse field line to extract name and type
+                stripped = fl.strip().rstrip(";")
+                parts = stripped.split()
+                if len(parts) >= 3 and parts[0] == "private":
+                    if parts[1] == "static":
+                        # static final field
+                        cls.fields.append(JavaField(
+                            name=parts[3] if len(parts) > 3 else parts[2],
+                            java_type=parts[2],
+                            access="private",
+                            is_constant=True,
+                        ))
+                    else:
+                        field_type = parts[1]
+                        field_name = parts[2].split("=")[0].strip()
+                        init_val = None
+                        if "=" in fl:
+                            init_val = fl.split("=", 1)[1].strip().rstrip(";").strip()
+                        cls.fields.append(JavaField(
+                            name=field_name,
+                            java_type=field_type,
+                            initial_value=init_val,
+                            access="private",
+                        ))
 
             # Methods
             open_method = JavaMethod(
@@ -381,34 +399,35 @@ class OopTransformer:
 
         main_class.imports.add("java.util.Scanner")
 
-        # Vendor-specific imports based on EXEC blocks
+        # Strategy-driven imports based on EXEC blocks
         if program.has_exec_sql:
-            main_class.imports.add("java.sql.Connection")
-            main_class.imports.add("java.sql.DriverManager")
-            main_class.imports.add("java.sql.PreparedStatement")
-            main_class.imports.add("java.sql.ResultSet")
-            main_class.imports.add("java.sql.SQLException")
+            main_class.imports.update(self.strategies.sql.generate_imports())
 
         if program.has_exec_cics:
-            main_class.imports.add("// TODO: Add CICS service interface imports")
+            main_class.imports.update(self.strategies.cics.generate_imports())
 
-        # Add SQL connection field if needed
+        # Add SQL fields via strategy if needed
         if program.has_exec_sql:
-            main_class.fields.insert(0, JavaField(
-                name="connection",
-                java_type="Connection",
-                access="private",
-                comment="JDBC connection for embedded SQL",
-                original_cobol_name="EXEC-SQL-CONNECTION",
-            ))
-            main_class.fields.insert(1, JavaField(
-                name="sqlCode",
-                java_type="int",
-                initial_value="0",
-                access="private",
-                comment="SQLCODE return value",
-                original_cobol_name="SQLCODE",
-            ))
+            sql_field_lines = self.strategies.sql.generate_fields("    ")
+            # Parse field definitions into JavaField objects
+            for fl in sql_field_lines:
+                stripped = fl.strip().rstrip(";")
+                if stripped.startswith("//") or stripped.startswith("/**"):
+                    continue
+                parts = stripped.split()
+                if len(parts) >= 3 and parts[0] == "private":
+                    field_type = parts[1]
+                    field_name = parts[2].split("=")[0].strip()
+                    init_val = None
+                    if "=" in fl:
+                        init_val = fl.split("=", 1)[1].strip().rstrip(";").strip()
+                    main_class.fields.insert(0, JavaField(
+                        name=field_name,
+                        java_type=field_type,
+                        initial_value=init_val,
+                        access="private",
+                        comment=f"Generated by {self.strategies.sql.__class__.__name__}",
+                    ))
 
         return main_class
 

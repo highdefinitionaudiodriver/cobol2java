@@ -176,14 +176,12 @@ def to_camel_case(cobol_name: str) -> str:
 
 def pic_to_java_type(picture: str, usage: str = "", vendor: str = "standard") -> str:
     if not picture:
-        if "COMP" in usage or "BINARY" in usage:
-            return "int"
-        if "COMP-1" in usage:
-            return "float"
-        if "COMP-2" in usage:
-            return "double"
-        # Vendor-specific USAGE types (COMP-5, COMP-X, BINARY-LONG, etc.)
         usage_upper = usage.upper()
+        # Check specific COMP variants before generic COMP/BINARY
+        if usage_upper == "COMP-1":
+            return "float"
+        if usage_upper == "COMP-2":
+            return "double"
         if usage_upper in ("COMP-5", "COMP-X", "BINARY-LONG"):
             return "int"
         if usage_upper in ("BINARY-SHORT",):
@@ -204,6 +202,9 @@ def pic_to_java_type(picture: str, usage: str = "", vendor: str = "standard") ->
             return "String"
         if usage_upper in ("NATIVE-2",):
             return "short"
+        # Generic COMP/BINARY fallback
+        if "COMP" in usage_upper or "BINARY" in usage_upper:
+            return "int"
         if usage_upper in ("NATIVE-4",):
             return "int"
         if usage_upper in ("NATIVE-8", "BINARY-C-LONG"):
@@ -253,24 +254,60 @@ def _is_verb_start(text: str) -> bool:
 
 
 class CobolParser:
-    def __init__(self, encoding: str = "utf-8"):
+    def __init__(self, encoding: str = "utf-8", use_lark: bool = True):
         self.encoding = encoding
+        self.use_lark = use_lark
+        self._lark_parser = None
+        self._procedure_parser = None
+        self._division_router = None
+        self._preprocessor = None
+        if use_lark:
+            try:
+                from .lark_data_parser import LarkDataParser
+                self._lark_parser = LarkDataParser()
+            except ImportError:
+                self._lark_parser = None
+            try:
+                from .lark_procedure_parser import ProcedureDivisionParser
+                self._procedure_parser = ProcedureDivisionParser()
+            except ImportError:
+                self._procedure_parser = None
+            try:
+                from .division_parser import DivisionRouter, CobolPreprocessor
+                self._division_router = DivisionRouter(self)
+                self._preprocessor = CobolPreprocessor()
+            except ImportError:
+                self._division_router = None
+                self._preprocessor = None
 
     def parse_file(self, filepath: str) -> CobolProgram:
         with open(filepath, "r", encoding=self.encoding, errors="replace") as f:
             raw_lines = f.readlines()
 
-        lines = self._preprocess(raw_lines)
+        lines = self._preprocess_dispatch(raw_lines)
         program = CobolProgram(source_file=filepath)
-        self._parse_program(lines, program)
+        self._parse_program_dispatch(lines, program)
         return program
 
     def parse_string(self, source: str) -> CobolProgram:
         raw_lines = source.splitlines(keepends=True)
-        lines = self._preprocess(raw_lines)
+        lines = self._preprocess_dispatch(raw_lines)
         program = CobolProgram()
-        self._parse_program(lines, program)
+        self._parse_program_dispatch(lines, program)
         return program
+
+    def _preprocess_dispatch(self, raw_lines: List[str]) -> List[str]:
+        """Use structured preprocessor if available, else legacy."""
+        if self._preprocessor is not None:
+            return self._preprocessor.process(raw_lines)
+        return self._preprocess(raw_lines)
+
+    def _parse_program_dispatch(self, lines: List[str], program: CobolProgram):
+        """Use structured division router if available, else legacy."""
+        if self._division_router is not None:
+            self._division_router.parse(lines, program)
+        else:
+            self._parse_program(lines, program)
 
     def _preprocess(self, raw_lines: List[str]) -> List[str]:
         """Clean raw source lines: handle fixed/free format, remove comments, handle continuations."""
@@ -359,6 +396,16 @@ class CobolParser:
                 else:
                     in_exec = True
                     exec_accumulator = line.strip()
+                idx += 1
+                continue
+
+            # Handle COPY statements in DATA DIVISION
+            copy_match = re.match(r'^COPY\s+(\S+)', upper)
+            if copy_match:
+                if current.strip():
+                    statements.append(current.strip())
+                    current = ""
+                statements.append("__COPY__" + copy_match.group(1).rstrip("."))
                 idx += 1
                 continue
 
@@ -541,9 +588,23 @@ class CobolParser:
                     if hasattr(self, '_current_program') and self._current_program:
                         self._current_program.has_exec_sql = True
                         self._current_program.exec_data_blocks.append(exec_text)
+            elif stmt.startswith("__COPY__"):
+                copy_name = stmt[8:]  # Remove __COPY__ prefix
+                if hasattr(self, '_current_program') and self._current_program:
+                    self._current_program.copy_members.append(copy_name)
             else:
-                self._parse_data_statement(stmt, items)
+                self._parse_data_statement_dispatch(stmt, items)
         return next_idx
+
+    def _parse_data_statement_dispatch(self, stmt: str, items: List[DataItem]):
+        """Try lark parser first, fall back to regex parser on failure."""
+        if self._lark_parser is not None:
+            item = self._lark_parser.parse_statement(stmt)
+            if item is not None:
+                self._place_data_item(item, items)
+                return
+        # Fallback to regex-based parser
+        self._parse_data_statement(stmt, items)
 
     def _parse_data_statement(self, stmt: str, items: List[DataItem],
                                _stack: List[DataItem] = None):
@@ -653,7 +714,15 @@ class CobolParser:
         # First, segment the raw lines into logical statements
         proc_statements = self._segment_procedure(lines, start_idx)
 
-        # Now parse the segmented statements
+        # Use structured parser if available, otherwise fall back to legacy
+        if self._procedure_parser is not None:
+            self._procedure_parser.parse(proc_statements, program)
+            return
+
+        self._parse_procedure_division_legacy(proc_statements, program)
+
+    def _parse_procedure_division_legacy(self, proc_statements: List[str], program: CobolProgram):
+        """Legacy procedure division parser (regex-based fallback)."""
         current_paragraph = None
         current_section = None
         idx = 0
