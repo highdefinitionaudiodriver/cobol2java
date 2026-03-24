@@ -1,0 +1,43 @@
+# --- Python Standard ---
+__pycache__
+.py[cod]
+$py.class
+.env
+.venv
+env
+venv
+ENV
+
+# --- Parser Cache (Lark) ---
+# LarkのLALRパーサーなどがキャッシュを生成する場合の対策
+.lark.cache
+
+# --- Build & Distribution (PyInstaller) ---
+# EXE本体やビルド中の中間ファイルを除外
+build
+dist
+# ※ COBOL2Java.spec はビルド手順の再現に必要なので、
+#    このファイルで明示的に除外していない限りGit管理に残ります。
+
+# --- Project Specific Outputs ---
+# 変換結果やテスト結果は共有不要なため除外
+output
+test_output
+.log
+
+# --- Unit Testing ---
+.pytest_cache
+.coverage
+htmlcov
+
+# --- IDEs & Editors ---
+.vscode
+.idea
+.swp
+.swo
+.DS_Store
+Thumbs.db
+
+# --- Java (Converted artifacts) ---
+# もし変換後のJavaをコンパイルした際のクラスファイルが混入しても除外
+.class
