@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 上司に出せる HTML サマリ出力オプション付き（`--html`）
   - UTF-8 BOM 付き CSV（Excel での文字化け回避）
   - 文字コード自動判定（UTF-8 / SJIS / EUC-JP / CP932 / Latin-1）
+- **examples/sample_legacy_app/** — CC0 公開デモコーパス
+  - 製造業の受注・在庫・売掛・月次締めシステムを模した 5 本の `.cbl` + COPYBOOK 2 本
+  - 難易度 2〜4 が混在し、`difficulty_scorer.py` のキャリブレーション材料として使える
+  - EXEC SQL / EXEC CICS / EXEC DLI / COPY / OCCURS / COMP-3 / GO TO / ALTER 等、
+    実プロジェクト頻出パターンを意図的に含む
+  - **CC0 ライセンス**（パブリックドメイン相当）で誰でも改変・商用利用可
 
 ## [0.1.0]
 
