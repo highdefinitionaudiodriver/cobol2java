@@ -646,7 +646,7 @@ class CobolParser:
 
         # USAGE clause
         usage_match = re.search(
-            r'USAGE\s+(?:IS\s+)?(\S+)|\b(COMP(?:-[0-9])?|BINARY|PACKED-DECIMAL)\b',
+            r'USAGE\s+(?:IS\s+)?(\S+)|\b(COMP(?:-[0-9])?|BINARY|PACKED-DECIMAL|FUNCTION-POINTER|PROCEDURE-POINTER|POINTER)\b',
             rest, re.IGNORECASE
         )
         if usage_match:

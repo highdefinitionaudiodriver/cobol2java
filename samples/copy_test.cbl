@@ -1,0 +1,20 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. COPYTEST.
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           COPY FILECTRL.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       COPY WSCOPYBOOK.
+       COPY SQLCA.
+       01 WS-RECORD.
+          05 WS-FIELD1 PIC X(10).
+          05 WS-FIELD2 PIC 9(5).
+          05 WS-STATUS PIC X.
+             88 WS-OK VALUE "Y".
+             88 WS-ERR VALUE "N".
+             88 WS-PENDING VALUE "P".
+       PROCEDURE DIVISION.
+       MAIN-PARA.
+           STOP RUN.

@@ -35,6 +35,21 @@ COBOL2Java parses COBOL source files and generates structured Java migration can
 
 ---
 
+## 🎬 デモ / まず見るもの
+
+<!-- docs/demo.gif に「COBOLフォルダ選択 → 難易度スコアリング → CSV/HTMLレポート確認」までの30秒デモGIFを配置してください。 -->
+![COBOL2Java demo](docs/demo.gif)
+
+移行前アセスメントだけを素早く見せる場合：
+
+```bash
+python scripts/difficulty_scorer.py examples/sample_legacy_app --html cobol_migration_summary.html
+```
+
+出力されるスコアは、完全自動変換の約束ではなく、見積もり・PoC範囲・人手レビュー範囲を決めるための材料です。
+
+---
+
 ### Business Use Cases
 
 - COBOL asset inventory and modernization difficulty assessment
