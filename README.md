@@ -297,3 +297,18 @@ This project is licensed under the MIT License. See [LICENSE](LICENSE) for detai
 - 個人・社内 PoC 利用は無料（MIT ライセンス）
 - 自社 COBOL 資産の難易度評価レポート、独自方言サポート、業界特化（金融・公共）の追加ルール開発は応相談
 - 連絡先：highdefinitionaudiodriver@gmail.com
+
+<!-- CODEX-CURRENT-STATUS:START -->
+## 現状サマリ (2026-05-25)
+
+- 対象: COBOL2Java
+- 作業ブランチ: feat/sellable-v1
+- README更新時点の参照コミット: f4939b9 test: add missing cobol test sample files and fix parser usage clause regex
+- Python 実行環境向けに requirements.txt を同梱。
+- docs ディレクトリ配下に設計・運用・補足資料を配置。
+- tests ディレクトリ配下にテストを配置。
+- src ディレクトリ配下に主要実装を配置。
+- 主要な確認コマンド: python -m pytest または README 記載の Python コマンド
+- 次に進めるなら、README 内の利用手順と既存 docs / tests を起点に、未整備の検証手順・引き継ぎメモ・CI 化を補強する。
+<!-- CODEX-CURRENT-STATUS:END -->
+
