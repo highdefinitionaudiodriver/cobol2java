@@ -206,55 +206,359 @@ def write_html(scores: list[FileScore], out_path: Path) -> None:
         rows.append(
             f"<tr><td>{html.escape(s.relative_path)}</td>"
             f"<td>{s.loc}</td>"
-            f"<td><strong class='d{s.difficulty_1to5}'>{s.difficulty_1to5}</strong></td>"
+            f"<td><span class='badge d{s.difficulty_1to5}'>難易度 {s.difficulty_1to5}</span></td>"
             f"<td>{s.suggested_effort_hours:.1f} h</td>"
-            f"<td>{html.escape(hit_summary)}</td></tr>"
+            f"<td class='findings-cell'>{html.escape(hit_summary)}</td></tr>"
         )
 
     histogram = "".join(
-        f"<div class='bar'><span>難易度 {d}</span>"
-        f"<div class='fill d{d}' style='width:{(by_diff[d] / max(1, len(scores))) * 100:.1f}%'></div>"
-        f"<span class='n'>{by_diff[d]} ファイル</span></div>"
+        f"<div class='histogram-row'>"
+        f"  <span class='histogram-label'>難易度 {d}</span>"
+        f"  <div class='histogram-bar-bg'>"
+        f"    <div class='histogram-bar d{d}' style='width:{(by_diff[d] / max(1, len(scores))) * 100:.1f}%'></div>"
+        f"  </div>"
+        f"  <span class='histogram-count'>{by_diff[d]} ファイル ({(by_diff[d] / max(1, len(scores))) * 100:.1f}%)</span>"
+        f"</div>"
         for d in range(1, 6)
     )
 
     html_text = f"""<!DOCTYPE html>
-<html lang="ja"><head><meta charset="UTF-8"><title>COBOL 移行難易度レポート</title>
-<style>
-  body {{ font-family: "Yu Gothic UI", "Hiragino Sans", sans-serif; max-width: 980px; margin: 24px auto; color: #222; padding: 0 20px; }}
-  h1 {{ font-size: 22px; border-bottom: 3px solid #c62828; padding-bottom: 6px; }}
-  .summary {{ background: #f5f5f5; padding: 16px; border-radius: 6px; margin: 16px 0; }}
-  .summary p {{ margin: 4px 0; }}
-  .bar {{ display: flex; align-items: center; gap: 12px; margin: 6px 0; font-size: 13px; }}
-  .bar > span:first-child {{ width: 80px; }}
-  .bar .fill {{ height: 18px; border-radius: 3px; }}
-  .bar .n {{ font-variant-numeric: tabular-nums; color: #666; }}
-  .d1 {{ background: #4caf50; color: #2e7d32; }}
-  .d2 {{ background: #8bc34a; color: #558b2f; }}
-  .d3 {{ background: #ffb300; color: #ef6c00; }}
-  .d4 {{ background: #ef5350; color: #c62828; }}
-  .d5 {{ background: #b71c1c; color: #b71c1c; }}
-  table {{ width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; }}
-  th, td {{ border-bottom: 1px solid #ddd; padding: 8px 10px; text-align: left; }}
-  th {{ background: #fafafa; }}
-  .meta {{ font-size: 11px; color: #888; margin-top: 24px; }}
-</style></head><body>
-<h1>COBOL 移行難易度レポート</h1>
-<div class="summary">
-  <p><strong>対象ファイル数</strong>: {len(scores)}</p>
-  <p><strong>合計 LOC（コメント除外）</strong>: {sum(s.loc for s in scores):,}</p>
-  <p><strong>概算合計工数</strong>: {total_effort:,.1f} 時間 ≒ {total_effort/8:,.1f} 人日</p>
-</div>
-<h2>難易度ヒストグラム</h2>
-{histogram}
-<h2>難易度の高いファイル Top 20</h2>
-<table>
-<thead><tr><th>ファイル</th><th>LOC</th><th>難易度</th><th>概算工数</th><th>主な検出</th></tr></thead>
-<tbody>{''.join(rows)}</tbody>
-</table>
-<p class="meta">⚠️ 本レポートは静的解析による <strong>見積もり用たたき台</strong> です。COPY 展開・実行時動作・既存テストの存在は考慮していません。最終工数は人手レビューで確定してください。<br>
-生成: {datetime.now().isoformat(timespec='seconds')} / cobol2java difficulty_scorer.py</p>
-</body></html>"""
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>COBOL 移行難易度レポート</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {{
+      --primary-color: #b91c1c;
+      --primary-gradient: linear-gradient(135deg, #b91c1c, #7f1d1d);
+      --bg-color: #fcfcfc;
+      --card-bg: #ffffff;
+      --text-color: #1e293b;
+      --text-muted: #64748b;
+      --border-color: #e2e8f0;
+      
+      --color-d1: #15803d;
+      --bg-d1: #dcfce7;
+      --color-d2: #4d7c0f;
+      --bg-d2: #ecfccb;
+      --color-d3: #b45309;
+      --bg-d3: #fef3c7;
+      --color-d4: #b91c1c;
+      --bg-d4: #fee2e2;
+      --color-d5: #7f1d1d;
+      --bg-d5: #fca5a5;
+    }}
+    
+    body {{
+      font-family: 'Inter', 'Noto Sans JP', sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      line-height: 1.6;
+      margin: 0;
+      padding: 40px 20px;
+    }}
+    
+    .container {{
+      max-width: 1000px;
+      margin: 0 auto;
+    }}
+    
+    header {{
+      background: var(--primary-gradient);
+      color: #ffffff;
+      padding: 35px 40px;
+      border-radius: 16px;
+      margin-bottom: 30px;
+      box-shadow: 0 10px 25px -5px rgba(185, 28, 28, 0.15);
+      position: relative;
+      overflow: hidden;
+    }}
+    
+    header::after {{
+      content: "";
+      position: absolute;
+      top: -50%;
+      right: -20%;
+      width: 400px;
+      height: 400px;
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 50%;
+    }}
+    
+    .badge-report {{
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.2);
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+    }}
+    
+    header h1 {{
+      margin: 0;
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }}
+    
+    header .subtitle {{
+      margin-top: 8px;
+      font-size: 14px;
+      opacity: 0.9;
+      font-weight: 300;
+    }}
+    
+    .kpi-grid {{
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      margin-bottom: 30px;
+    }}
+    
+    .kpi-card {{
+      background: var(--card-bg);
+      padding: 24px;
+      border-radius: 16px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+      border: 1px solid var(--border-color);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }}
+    
+    .kpi-card:hover {{
+      transform: translateY(-2px);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }}
+    
+    .kpi-val {{
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--primary-color);
+      line-height: 1.2;
+    }}
+    
+    .kpi-label {{
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 6px;
+      font-weight: 600;
+    }}
+    
+    section {{
+      background: var(--card-bg);
+      padding: 35px 40px;
+      border-radius: 16px;
+      margin-bottom: 30px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+      border: 1px solid var(--border-color);
+    }}
+    
+    section h2 {{
+      font-size: 18px;
+      font-weight: 700;
+      margin-top: 0;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #f1f5f9;
+      color: var(--text-color);
+    }}
+    
+    .histogram-row {{
+      display: flex;
+      align-items: center;
+      margin-bottom: 12px;
+      font-size: 13px;
+    }}
+    
+    .histogram-label {{
+      width: 80px;
+      font-weight: 600;
+    }}
+    
+    .histogram-bar-bg {{
+      flex: 1;
+      height: 18px;
+      background-color: #f1f5f9;
+      border-radius: 4px;
+      overflow: hidden;
+      margin: 0 15px;
+    }}
+    
+    .histogram-bar {{
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.3s ease;
+    }}
+    
+    .histogram-count {{
+      width: 140px;
+      text-align: right;
+      color: var(--text-muted);
+      font-weight: 500;
+    }}
+    
+    .d1 {{ background-color: #22c55e; color: var(--color-d1); background-color: var(--bg-d1); }}
+    .d2 {{ background-color: #84cc16; color: var(--color-d2); background-color: var(--bg-d2); }}
+    .d3 {{ background-color: #eab308; color: var(--color-d3); background-color: var(--bg-d3); }}
+    .d4 {{ background-color: #ef4444; color: var(--color-d4); background-color: var(--bg-d4); }}
+    .d5 {{ background-color: #7f1d1d; color: var(--color-d5); background-color: var(--bg-d5); }}
+    
+    table {{
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13.5px;
+      text-align: left;
+    }}
+    
+    th {{
+      font-weight: 600;
+      color: var(--text-color);
+      border-bottom: 2px solid var(--border-color);
+      padding: 12px 16px;
+      background-color: #f8fafc;
+    }}
+    
+    td {{
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border-color);
+      color: #334155;
+    }}
+    
+    tr:hover td {{
+      background-color: #f8fafc;
+    }}
+    
+    .badge {{
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      text-align: center;
+      width: 70px;
+    }}
+    
+    .findings-cell {{
+      color: var(--text-muted);
+      font-size: 12.5px;
+    }}
+    
+    .meta-box {{
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border-color);
+      text-align: center;
+      line-height: 1.8;
+    }}
+    
+    @media (max-width: 768px) {{
+      .kpi-grid {{
+        grid-template-columns: 1fr;
+      }}
+      body {{
+        padding: 20px 10px;
+      }}
+      section {{
+        padding: 25px 20px;
+      }}
+    }}
+    
+    @media print {{
+      body {{
+        background-color: #ffffff;
+        padding: 0;
+      }}
+      .container {{
+        max-width: 100%;
+      }}
+      header {{
+        background: none !important;
+        color: #000000 !important;
+        border: 1px solid var(--border-color);
+        box-shadow: none !important;
+        padding: 20px;
+      }}
+      header .subtitle {{
+        color: #334155;
+      }}
+      .badge-report {{
+        border: 1px solid #64748b;
+        color: #000000;
+      }}
+      .kpi-card {{
+        border: 1px solid var(--border-color);
+        box-shadow: none !important;
+      }}
+      section {{
+        border: 1px solid var(--border-color);
+        box-shadow: none !important;
+        page-break-inside: avoid;
+      }}
+    }}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="badge-report">Complexity Assessment</div>
+      <h1>COBOL 移行難易度レポート</h1>
+      <div class="subtitle">COBOL ソースコード資産の難易度分類およびJava移行工数分析</div>
+    </header>
+
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-val">{len(scores)}</div>
+        <div class="kpi-label">対象ファイル数</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-val">{sum(s.loc for s in scores):,}</div>
+        <div class="kpi-label">合計 LOC（コメント除外）</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-val">{total_effort/8:,.1f}</div>
+        <div class="kpi-label">概算合計工数（人日）</div>
+      </div>
+    </div>
+
+    <section>
+      <h2>難易度ヒストグラム</h2>
+      {histogram}
+    </section>
+
+    <section>
+      <h2>難易度の高いファイル Top 20</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>ファイル</th>
+            <th style="width: 80px;">LOC</th>
+            <th style="width: 120px;">難易度</th>
+            <th style="width: 100px;">概算工数</th>
+            <th>主な検出</th>
+          </tr>
+        </thead>
+        <tbody>
+          {''.join(rows)}
+        </tbody>
+      </table>
+    </section>
+
+    <div class="meta-box">
+      ⚠️ 本レポートは静的解析による <strong>見積もり用たたき台</strong> です。<br>
+      COPY 展開・実行時動作・既存テストの存在は考慮していません。<br>
+      最終工数は人手レビューで確定してください。<br>
+      生成: {datetime.now().isoformat(timespec='seconds')} / cobol2java difficulty_scorer.py
+    </div>
+  </div>
+</body>
+</html>"""
     out_path.write_text(html_text, encoding="utf-8")
 
 
