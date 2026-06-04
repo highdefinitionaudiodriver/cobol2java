@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-06-04
+
 ### Fixed
 - 条件式変換: COBOL の記号比較演算子を正しく Java へ変換するよう修正（コンパイル不能な Java を生成していたバグ）
   - `WS-X = 5` → `wsX == 5`（従来は `=` のまま＝代入になっていた）
