@@ -77,7 +77,14 @@ class JavaCodeGenerator:
         imports = sorted(cls.imports)
         if imports:
             for imp in imports:
-                lines.append(f"import {imp};")
+                # Some strategies emit comment placeholders (e.g. CICS TODOs)
+                # into the import set. Emit those verbatim instead of wrapping
+                # them in `import ...;`, which would produce invalid Java.
+                stripped = imp.strip()
+                if stripped.startswith("//") or stripped.startswith("/*"):
+                    lines.append(stripped)
+                else:
+                    lines.append(f"import {imp};")
             lines.append("")
 
         # Class Javadoc
@@ -1095,6 +1102,19 @@ class JavaCodeGenerator:
         cond = re.sub(r'\bEQUAL\s+TO\b', '==', cond, flags=re.IGNORECASE)
         cond = re.sub(r'\bEQUAL\b', '==', cond, flags=re.IGNORECASE)
         cond = re.sub(r'\bIS\s+NOT\b', '!=', cond, flags=re.IGNORECASE)
+
+        # Symbolic combined relations (COBOL abbreviations: NOT =, NOT >, NOT <).
+        # Longer operators first so "NOT >=" is not consumed by the "NOT >" rule.
+        cond = re.sub(r'\bNOT\s*>=', '<', cond, flags=re.IGNORECASE)
+        cond = re.sub(r'\bNOT\s*<=', '>', cond, flags=re.IGNORECASE)
+        cond = re.sub(r'\bNOT\s*=', '!=', cond, flags=re.IGNORECASE)
+        cond = re.sub(r'\bNOT\s*>', '<=', cond, flags=re.IGNORECASE)
+        cond = re.sub(r'\bNOT\s*<', '>=', cond, flags=re.IGNORECASE)
+
+        # Bare COBOL equality '=' -> Java '=='. In a condition, '=' is always a
+        # comparison (COBOL has no assignment inside IF), so this is safe.
+        # The negative look-around avoids touching already-built ==, !=, >=, <=.
+        cond = re.sub(r'(?<![=!<>])=(?![=])', '==', cond)
 
         # NUMERIC / ALPHABETIC checks
         cond = re.sub(r'(\S+)\s+IS\s+NUMERIC', r'\1 != null', cond, flags=re.IGNORECASE)

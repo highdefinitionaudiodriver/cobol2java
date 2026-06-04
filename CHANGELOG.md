@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- 条件式変換: COBOL の記号比較演算子を正しく Java へ変換するよう修正（コンパイル不能な Java を生成していたバグ）
+  - `WS-X = 5` → `wsX == 5`（従来は `=` のまま＝代入になっていた）
+  - `X NOT = 0` → `x != 0` / `X NOT > Y` → `x <= y` / `X NOT < Y` → `x >= y`（従来は `not` が残留）
+- CICS サービスインターフェイスのプレースホルダ（`// TODO ...`）が `import // TODO ...;` という不正な import 文として出力されていた問題を修正（コメント行として出力）
+- 上記の回帰を防ぐ `tests/test_condition_conversion.py`（10ケース）を追加
+
 ### Added
 - README に「これは何？（30秒で）」「想定ユースケース・価格帯」セクションを追加（金融・公共向け PoC 提案の判断材料）
 - 「完全自動変換ではない」ことを明示する免責ブロックを追加
