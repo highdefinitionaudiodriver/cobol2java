@@ -1,0 +1,11 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.6.0.schema.json
+PackageIdentifier: highdefinitionaudiodriver.cobol2java
+PackageVersion: 2.1.0
+InstallerType: exe   # 実際の配布物に合わせる (exe/inno/nullsoft/msi/zip/portable)
+InstallerLocale: ja-JP
+Installers:
+  - Architecture: x64
+    InstallerUrl: https://github.com/highdefinitionaudiodriver/cobol2java/releases/download/v2.1.0/cobol2java-2.1.0-setup.exe   # ★実在する Release アセットURLに置換
+    InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000   # ★実ファイルのSHA256に置換
+ManifestType: installer
+ManifestVersion: 1.6.0

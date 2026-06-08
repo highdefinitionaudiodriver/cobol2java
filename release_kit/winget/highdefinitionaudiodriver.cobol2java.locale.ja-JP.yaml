@@ -1,0 +1,13 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
+PackageIdentifier: highdefinitionaudiodriver.cobol2java
+PackageVersion: 2.1.0
+PackageLocale: ja-JP
+Publisher: highdefinitionaudiodriver
+PublisherUrl: https://github.com/highdefinitionaudiodriver
+PackageName: cobol2java - COBOL→Java 変換ツール
+PackageUrl: https://github.com/highdefinitionaudiodriver/cobol2java
+License: MIT
+ShortDescription: A desktop GUI and Command Line (CLI) tool for COBOL modernization assessment and Java migration scaffolding — with objec
+Moniker: cobol2java
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0
