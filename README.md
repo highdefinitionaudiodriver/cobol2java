@@ -86,6 +86,10 @@ cd cobol2java
 # Install dependencies (only PyInstaller for building; the tool itself has no runtime deps)
 pip install -r requirements.txt
 
+# ★ まず動きを見たい人へ: 同梱サンプルを即変換（入力/出力の指定不要）
+python main.py --demo
+#   → demo_output/ に生成された Java を確認できます
+
 # Run the GUI
 python main.py
 ```

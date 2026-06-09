@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `--demo` オプション: 同梱サンプル（`examples/sample_legacy_app`）を**入力/出力の指定なしに即変換**し、`demo_output/` に Java を生成（「叩けば即結果」）。デモ実行の単体テストを追加
+
 ## [2.1.0] - 2026-06-04
 
 ### Fixed

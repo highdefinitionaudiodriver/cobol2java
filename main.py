@@ -162,7 +162,25 @@ def main():
     parser.add_argument("--no-services", action="store_true", help="Disable extracting Services")
     parser.add_argument("--no-filehandlers", action="store_true", help="Disable extracting File Handlers")
 
+    parser.add_argument("--demo", action="store_true",
+                        help="Convert the bundled sample (examples/sample_legacy_app) into demo_output/ — no input/output needed")
+
     args = parser.parse_args()
+
+    # --demo: run instantly on the bundled sample so users see results right away
+    if args.demo:
+        if not args.input:
+            args.input = os.path.join(BASE_DIR, "examples", "sample_legacy_app")
+        if not args.output:
+            args.output = os.path.join(BASE_DIR, "demo_output")
+        print("=" * 60)
+        print("  DEMO MODE: converting the bundled sample COBOL app")
+        print(f"  Input : {args.input}")
+        print(f"  Output: {args.output}")
+        print("=" * 60)
+        run_cli(args)
+        print(f"\nDone. Open the generated Java under: {args.output}")
+        return
 
     # If standard inputs are provided, run CLI, else GUI
     if args.input and args.output:

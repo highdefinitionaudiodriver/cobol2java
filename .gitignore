@@ -36,3 +36,4 @@ test_output/
 *.tmp
 *.bak
 *.log
+demo_output/
