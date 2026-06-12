@@ -74,13 +74,13 @@ python scripts/difficulty_scorer.py examples/sample_legacy_app --html cobol_migr
 
 ### Option 1: Run the Pre-built Binary
 
-Download the executable for your OS (`COBOL2Java.exe` for Windows, or the respective Linux/macOS binary) from the [Releases](https://github.com/highdefinitionaudiodriver/cobol2java/releases) page and run it directly. No installation needed.
+Download the executable for your OS (`COBOL2Java.exe` for Windows, or the respective Linux/macOS binary) from the [Releases](https://gitlab.com/highdefinitionaudiodriver/cobol2java/-/releases) page and run it directly. No installation needed.
 
 ### Option 2: Run from Source
 
 ```bash
 # Clone the repository
-git clone https://github.com/highdefinitionaudiodriver/cobol2java.git
+git clone https://gitlab.com/highdefinitionaudiodriver/cobol2java.git
 cd cobol2java
 
 # Install dependencies (only PyInstaller for building; the tool itself has no runtime deps)
@@ -284,11 +284,11 @@ python -m pytest tests/test_data_types.py -v       # Data type mapping
 
 ## Contributing
 
-Bug reports and feature requests are welcome via [GitHub Issues](https://github.com/highdefinitionaudiodriver/cobol2java/issues).
+Bug reports and feature requests are welcome via [GitLab Issues](https://gitlab.com/highdefinitionaudiodriver/cobol2java/-/issues).
 
 ## Author
 
-**highdefinitionaudiodriver** — [GitHub](https://github.com/highdefinitionaudiodriver)
+**highdefinitionaudiodriver** — [GitLab](https://gitlab.com/highdefinitionaudiodriver)
 
 ## License
 
